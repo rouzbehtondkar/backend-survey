@@ -4,62 +4,72 @@ import { Repository } from "typeorm";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
 import { Admin } from "../admin/entities/admin.entity";
+import { User } from "../users/entities/user.entity";
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(Admin)
     private readonly adminRepository: Repository<Admin>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private jwtService: JwtService
   ) {}
 
-  async login(credentials: { username: string; password: string }) {
-    try {
-      // Find admin by username
-      const admin = await this.adminRepository.findOneBy({
-        username: credentials.username,
-      });
+  async validateUser(username: string, password: string): Promise<any> {
+    // First try to find admin
+    const admin = await this.adminRepository.findOne({
+      where: { username },
+    });
 
-      if (!admin) {
-        console.log(`No admin found with username: ${credentials.username}`);
-        throw new UnauthorizedException("Invalid credentials");
+    if (admin) {
+      const isPasswordValid = await bcrypt.compare(password, admin.password);
+      if (isPasswordValid) {
+        const { password, ...result } = admin;
+        return { ...result, role: "admin" };
       }
-
-      // Verify password
-      const isPasswordValid = await bcrypt.compare(
-        credentials.password,
-        admin.password
-      );
-
-      if (!isPasswordValid) {
-        console.log(`Invalid password for username: ${credentials.username}`);
-        throw new UnauthorizedException("Invalid credentials");
-      }
-
-      // Generate JWT token
-      const payload = {
-        sub: admin.id,
-        username: admin.username,
-      };
-
-      const token = await this.jwtService.signAsync(payload);
-
-      console.log(`Login successful for user: ${admin.username}`);
-
-      return {
-        message: "Login successful",
-        access_token: token,
-        admin: {
-          id: admin.id,
-          username: admin.username,
-        },
-      };
-    } catch (error) {
-      console.error("Login error:", error);
-      if (error instanceof UnauthorizedException) {
-        throw error;
-      }
-      throw new UnauthorizedException("An error occurred during login");
     }
+
+    // If not admin, try to find user
+    const user = await this.userRepository.findOne({
+      where: { username },
+    });
+
+    if (user) {
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (isPasswordValid) {
+        const { password, ...result } = user;
+        return result;
+      }
+    }
+
+    return null;
+  }
+
+  async login(credentials: { username: string; password: string }) {
+    const user = await this.validateUser(
+      credentials.username,
+      credentials.password
+    );
+
+    if (!user) {
+      throw new UnauthorizedException("Invalid credentials");
+    }
+
+    const payload = {
+      sub: user.id,
+      username: user.username,
+      role: user.role,
+    };
+
+    return {
+      message: "Login successful",
+      access_token: await this.jwtService.signAsync(payload),
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+      },
+    };
   }
 }

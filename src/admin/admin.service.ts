@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
+import { Injectable, OnModuleInit, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import * as bcrypt from "bcrypt";
@@ -16,23 +16,30 @@ export class AdminService implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      // Delete existing admin if exists
-      await this.adminRepository.delete({ username: "admin" });
-
-      // Create new admin with hashed password
-      const hashedPassword = await bcrypt.hash("admin123", 10);
-      const admin = this.adminRepository.create({
-        username: "admin",
-        password: hashedPassword,
+      // Check if admin exists
+      const adminExists = await this.adminRepository.findOne({
+        where: { username: "admin" },
       });
 
-      const savedAdmin = await this.adminRepository.save(admin);
-      console.log("Default admin created successfully:", {
-        id: savedAdmin.id,
-        username: savedAdmin.username,
-      });
+      if (!adminExists) {
+        // Create default admin
+        const hashedPassword = await bcrypt.hash("admin123", 10);
+        const admin = this.adminRepository.create({
+          username: "admin",
+          password: hashedPassword,
+        });
+
+        const savedAdmin = await this.adminRepository.save(admin);
+        console.log("Default admin created successfully:", {
+          id: savedAdmin.id,
+          username: savedAdmin.username,
+        });
+      } else {
+        console.log("Admin user already exists");
+      }
     } catch (error) {
-      console.error("Error creating default admin:", error);
+      console.error("Error during admin initialization:", error);
+      throw error;
     }
   }
 
@@ -45,23 +52,48 @@ export class AdminService implements OnModuleInit {
     return await this.adminRepository.save(user);
   }
 
-  create(createAdminDto: CreateAdminDto) {
-    return "This action adds a new admin";
+  async create(createAdminDto: CreateAdminDto) {
+    const hashedPassword = await bcrypt.hash(createAdminDto.password, 10);
+    const admin = this.adminRepository.create({
+      ...createAdminDto,
+      password: hashedPassword,
+    });
+    const savedAdmin = await this.adminRepository.save(admin);
+    const { password, ...result } = savedAdmin;
+    return result;
   }
 
-  findAll() {
-    return `This action returns all admin`;
+  async findAll() {
+    const admins = await this.adminRepository.find();
+    return admins.map(({ password, ...rest }) => rest);
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} admin`;
+  async findOne(id: string) {
+    const admin = await this.adminRepository.findOne({ where: { id } });
+    if (!admin) {
+      throw new NotFoundException(`Admin with ID ${id} not found`);
+    }
+    const { password, ...result } = admin;
+    return result;
   }
 
-  update(id: number, updateAdminDto: UpdateAdminDto) {
-    return `This action updates a #${id} admin`;
+  async update(id: string, updateAdminDto: UpdateAdminDto) {
+    const admin = await this.findOne(id);
+
+    if (updateAdminDto.password) {
+      updateAdminDto.password = await bcrypt.hash(updateAdminDto.password, 10);
+    }
+
+    await this.adminRepository.update(id, updateAdminDto);
+    return this.findOne(id);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} admin`;
+  async remove(id: string) {
+    const admin = await this.adminRepository.findOne({ where: { id } });
+    if (!admin) {
+      throw new NotFoundException(`Admin with ID ${id} not found`);
+    }
+    await this.adminRepository.remove(admin);
+    return { message: "Admin deleted successfully" };
   }
 }
