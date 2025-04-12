@@ -1,37 +1,52 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Admin } from './entities/admin.entity';
-import { CreateUserDto } from './dto/create-user.dto';
-import { CreateAdminDto } from './dto/create-admin.dto';
-import { UpdateAdminDto } from './dto/update-admin.dto';
+import { Injectable, OnModuleInit } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import * as bcrypt from "bcrypt";
+import { Admin } from "./entities/admin.entity";
+import { CreateUserDto } from "./dto/create-user.dto";
+import { CreateAdminDto } from "./dto/create-admin.dto";
+import { UpdateAdminDto } from "./dto/update-admin.dto";
 
 @Injectable()
 export class AdminService implements OnModuleInit {
   constructor(
     @InjectRepository(Admin)
-    private readonly adminRepository: Repository<Admin>,
+    private readonly adminRepository: Repository<Admin>
   ) {}
 
   async onModuleInit() {
-    const adminExists = await this.adminRepository.findOneBy({ username: 'admin' });
-    if (!adminExists) {
+    try {
+      // Delete existing admin if exists
+      await this.adminRepository.delete({ username: "admin" });
+
+      // Create new admin with hashed password
+      const hashedPassword = await bcrypt.hash("admin123", 10);
       const admin = this.adminRepository.create({
-        username: 'admin',
-        password: 'admin123',
+        username: "admin",
+        password: hashedPassword,
       });
-      await this.adminRepository.save(admin);
+
+      const savedAdmin = await this.adminRepository.save(admin);
+      console.log("Default admin created successfully:", {
+        id: savedAdmin.id,
+        username: savedAdmin.username,
+      });
+    } catch (error) {
+      console.error("Error creating default admin:", error);
     }
   }
 
   async createUser(createUserDto: CreateUserDto) {
-    // در اینجا می‌توانیم منطق اضافی مثل هش کردن پسورد را اضافه کنیم
-    const user = this.adminRepository.create(createUserDto);
+    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const user = this.adminRepository.create({
+      ...createUserDto,
+      password: hashedPassword,
+    });
     return await this.adminRepository.save(user);
   }
 
   create(createAdminDto: CreateAdminDto) {
-    return 'This action adds a new admin';
+    return "This action adds a new admin";
   }
 
   findAll() {
