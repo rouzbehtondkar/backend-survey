@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { ConfigModule } from "@nestjs/config";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 import { AdminModule } from "./admin/admin.module";
 import { Admin } from "./admin/entities/admin.entity";
 import { AuthModule } from "./auth/auth.module";
@@ -21,7 +21,6 @@ import { User } from "./users/entities/user.entity";
       database: "survey_db",
       entities: [Admin, User],
       synchronize: true,
-      dropSchema: true,
       logging: true,
     }),
     AdminModule,

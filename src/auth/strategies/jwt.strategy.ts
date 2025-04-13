@@ -5,6 +5,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Admin } from "../../admin/entities/admin.entity";
 import { User } from "../../users/entities/user.entity";
+import { ConfigService } from "@nestjs/config";
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -12,12 +13,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     @InjectRepository(Admin)
     private adminRepository: Repository<Admin>,
     @InjectRepository(User)
-    private userRepository: Repository<User>
+    private userRepository: Repository<User>,
+    private configService: ConfigService
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: "super-secret-jwt-key-123",
+      secretOrKey: configService.get("JWT_SECRET", "super-secret-jwt-key-123"),
     });
   }
 
@@ -25,23 +27,27 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const { sub: id, username, role } = payload;
 
     // First check in admin table
-    const admin = await this.adminRepository.findOne({
-      where: { username },
-    });
+    if (role === "admin") {
+      const admin = await this.adminRepository.findOne({
+        where: { id },
+      });
 
-    if (admin) {
-      return { ...admin, role: "admin" };
+      if (admin) {
+        const { password, ...result } = admin;
+        return { ...result, role: "admin" };
+      }
     }
 
-    // If not admin, check in users table
+    // If not admin or admin not found, check in users table
     const user = await this.userRepository.findOne({
-      where: { username },
+      where: { id },
     });
 
     if (user) {
-      return user;
+      const { password, ...result } = user;
+      return result;
     }
 
-    throw new UnauthorizedException();
+    throw new UnauthorizedException("User not found");
   }
 }

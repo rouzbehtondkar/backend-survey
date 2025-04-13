@@ -63,11 +63,8 @@ export class UsersService {
       throw new NotFoundException("User not found");
     }
 
-    if (updateUserDto.password) {
-      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
-    }
-
-    if (updateUserDto.username) {
+    // If username is being updated, check for duplicates
+    if (updateUserDto.username && updateUserDto.username !== user.username) {
       const existingUser = await this.userRepository.findOne({
         where: { username: updateUserDto.username },
       });
@@ -77,10 +74,19 @@ export class UsersService {
       }
     }
 
-    await this.userRepository.update(id, updateUserDto);
+    // Hash password if it's being updated
+    if (updateUserDto.password) {
+      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
+    }
 
-    const updatedUser = await this.userRepository.findOne({ where: { id } });
-    const { password, ...result } = updatedUser;
+    // Update the user entity
+    Object.assign(user, updateUserDto);
+
+    // Save the updated entity
+    const savedUser = await this.userRepository.save(user);
+
+    // Return updated user without password
+    const { password, ...result } = savedUser;
     return result;
   }
 

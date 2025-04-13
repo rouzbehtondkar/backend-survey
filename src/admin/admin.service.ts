@@ -7,6 +7,14 @@ import { CreateUserDto } from "./dto/create-user.dto";
 import { CreateAdminDto } from "./dto/create-admin.dto";
 import { UpdateAdminDto } from "./dto/update-admin.dto";
 
+export enum UserRole {
+  ADMIN = "admin",
+  SALES_EXPERT = "sales_expert",
+  MARKET_DEVELOPMENT_EXPERT = "market_development_expert",
+  SALES_SUPERVISOR = "sales_supervisor",
+  MARKET_DEVELOPMENT_SUPERVISOR = "market_development_supervisor",
+}
+
 @Injectable()
 export class AdminService implements OnModuleInit {
   constructor(

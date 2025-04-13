@@ -38,6 +38,8 @@ export class UsersController {
   }
 
   @Patch(":id")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   update(
     @Param("id") id: string,
     @Body() updateUserDto: Partial<CreateUserDto>
