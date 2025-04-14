@@ -6,6 +6,8 @@ import { Admin } from "./admin/entities/admin.entity";
 import { AuthModule } from "./auth/auth.module";
 import { UsersModule } from "./users/users.module";
 import { User } from "./users/entities/user.entity";
+import { SurveyModule } from "./survey/survey.module";
+import { Survey } from "./survey/entities/survey.entity";
 
 @Module({
   imports: [
@@ -19,13 +21,14 @@ import { User } from "./users/entities/user.entity";
       username: "postgres",
       password: "admin",
       database: "survey_db",
-      entities: [Admin, User],
+      entities: [Admin, User, Survey],
       synchronize: true,
       logging: true,
     }),
     AdminModule,
     AuthModule,
     UsersModule,
+    SurveyModule,
   ],
 })
 export class AppModule {}
